@@ -1,4 +1,6 @@
-# ChatGPT Infinite
+# ChatGPT Infinite (Archive)
+
+This repository ("ChatGPT Infinite") has been moved to the [ChatGPT Playground]("https://github.com/mefengl/chatgpt-playground")
 
 ChatGPT-Infinite is a UserScript that automates the process of generating questions in the OpenAI chat interface. This script asks ChatGPT to generate a question, and then asks the generated question back to ChatGPT.
 

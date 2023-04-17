@@ -1,13 +1,34 @@
 // ==UserScript==
-// @name chatgpt-infinite
-// @namespace https://github.com/mefengl
-// @version 0.3.5
-// @description Infinite auto ask for chatgpt
-// @author mefengl
-// @match https://chat.openai.com/*
-// @icon https://www.google.com/s2/favicons?sz=64&domain=openai.com
-// @grant none
-// @license MIT
+// @name         chatgpt-infinite
+// @namespace    https://github.com/mefengl
+// @version      0.3.6
+// @description  Infinite auto ask for chatgpt
+// @icon         https://www.google.com/s2/favicons?sz=64&domain=openai.com
+// @author       mefengl
+// @match        https://chat.openai.com/*
+// @grant        none
+// @license      MIT
+
+// @name:en      ChatGPT Infinite
+// @description:en Infinite auto ask for chatgpt
+// @name:zh-CN   ChatGPT无限
+// @description:zh-CN 无限自动询问ChatGPT
+// @name:es      ChatGPT Infinito
+// @description:es Preguntas automáticas infinitas para chatgpt
+// @name:hi      चैटजीपीटी अनंत
+// @description:hi चैटजीपीटी के लिए अनंत स्वचालित पूछताछ
+// @name:ar      ChatGPT لانهائي
+// @description:ar طلب تلقائي لا نهائي لـ chatgpt
+// @name:pt      ChatGPT Infinito
+// @description:pt Perguntas automáticas infinitas para chatgpt
+// @name:ru      ChatGPT Бесконечный
+// @description:ru Бесконечный автоматический запрос для chatgpt
+// @name:ja      ChatGPTインフィニティ
+// @description:ja ChatGPTの無限自動質問
+// @name:de      ChatGPT Unendlich
+// @description:de Unendliches automatisches Fragen für ChatGPT
+// @name:fr      ChatGPT Infini
+// @description:fr Questions automatiques infinies pour chatgpt
 // ==/UserScript==
 (() => {
   var __async = (__this, __arguments, generator) => {
@@ -31,13 +52,6 @@
     });
   };
 
-  // src/askForLanguage/index.ts
-  function askForLanguage() {
-    return __async(this, null, function* () {
-      return prompt("What language do you want to use?");
-    });
-  }
-
   // ../../packages/chatkit/dist/index.mjs
   function getTextarea() {
     const form = document.querySelector("form");
@@ -48,12 +62,10 @@
     return result;
   }
   function getSubmitButton() {
-    const form = document.querySelector("form");
-    if (!form)
+    const textarea = getTextarea();
+    if (!textarea)
       return;
-    const buttons = form.querySelectorAll("button");
-    const result = buttons[buttons.length - 1];
-    return result;
+    return textarea.nextElementSibling;
   }
   function getRegenerateButton() {
     const form = document.querySelector("form");
@@ -90,7 +102,7 @@
   }
   function getTextareaValue() {
     var _a;
-    return ((_a = chatkit.getTextarea()) == null ? void 0 : _a.value) || "";
+    return ((_a = getTextarea()) == null ? void 0 : _a.value) || "";
   }
   function setTextarea(message) {
     const textarea = getTextarea();
@@ -106,17 +118,70 @@
       return;
     textarea.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
   }
+  function regenerate() {
+    const regenerateButton = getRegenerateButton();
+    if (!regenerateButton)
+      return;
+    regenerateButton.click();
+  }
+  function onSend(callback) {
+    const textarea = getTextarea();
+    if (!textarea)
+      return;
+    textarea.addEventListener("keydown", function(event) {
+      if (event.key === "Enter" && !event.shiftKey) {
+        callback();
+      }
+    });
+    const sendButton = getSubmitButton();
+    if (!sendButton)
+      return;
+    sendButton.addEventListener("mousedown", callback);
+  }
+  function isGenerating() {
+    var _a, _b;
+    return ((_b = (_a = getSubmitButton()) == null ? void 0 : _a.firstElementChild) == null ? void 0 : _b.childElementCount) === 3;
+  }
   function waitForIdle() {
     return new Promise((resolve) => {
       const interval = setInterval(() => {
-        if (!getStopGeneratingButton()) {
+        if (!isGenerating()) {
           clearInterval(interval);
           resolve();
         }
       }, 1e3);
     });
   }
-  var chatkit = {
+  function setListener(key = "prompt_texts") {
+    let last_trigger_time = +/* @__PURE__ */ new Date();
+    if (location.href.includes("chat.openai")) {
+      GM_addValueChangeListener(key, (name, old_value, new_value) => __async(this, null, function* () {
+        if (+/* @__PURE__ */ new Date() - last_trigger_time < 500) {
+          return;
+        }
+        last_trigger_time = +/* @__PURE__ */ new Date();
+        setTimeout(() => __async(this, null, function* () {
+          const prompt_texts = new_value;
+          if (prompt_texts.length > 0) {
+            let firstTime = true;
+            while (prompt_texts.length > 0) {
+              if (!firstTime) {
+                yield new Promise((resolve) => setTimeout(resolve, 2e3));
+              }
+              if (!firstTime && chatgpt.isGenerating()) {
+                continue;
+              }
+              firstTime = false;
+              const prompt_text = prompt_texts.shift() || "";
+              chatgpt.send(prompt_text);
+            }
+          }
+        }), 0);
+        GM_setValue(key, []);
+      }));
+    }
+  }
+  var chatgpt = {
     getTextarea,
     getSubmitButton,
     getRegenerateButton,
@@ -126,9 +191,20 @@
     getTextareaValue,
     setTextarea,
     send,
-    waitForIdle
+    regenerate,
+    onSend,
+    isGenerating,
+    waitForIdle,
+    setListener
   };
-  var src_default = chatkit;
+  var chatgpt_default = chatgpt;
+
+  // src/askForLanguage/index.ts
+  function askForLanguage() {
+    return __async(this, null, function* () {
+      return prompt("What language do you want to use?");
+    });
+  }
 
   // src/infiniteLoop/index.ts
   function startInfiniteLoop() {
@@ -136,13 +212,13 @@
       const language = yield askForLanguage();
       if (!language)
         return;
-      src_default.send(`you can only answer question in ${language} language`);
-      yield src_default.waitForIdle();
+      chatgpt_default.send(`you can only answer question in ${language} language`);
+      yield chatgpt_default.waitForIdle();
       while (true) {
-        const lastResponse = src_default.getLastResponse();
+        const lastResponse = chatgpt_default.getLastResponse();
         const question = extractQuestion(lastResponse);
-        yield src_default.send(question + "\nanswer above question, and show me one more further question I can ask in the end prefixed with Q:");
-        yield src_default.waitForIdle();
+        yield chatgpt_default.send(question + "\nanswer above question, and show me one more further question I can ask in the end prefixed with Q:");
+        yield chatgpt_default.waitForIdle();
         yield sleep(1e4);
       }
     });
